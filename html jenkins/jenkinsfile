@@ -1,0 +1,58 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'REPO_URL', defaultValue: 'https://github.com/ElQuenta/Jenkins-Vercel.git', description: 'URL del repo. Si vacío se usa checkout scm (multibranch).')
+    string(name: 'BRANCH', defaultValue: 'main', description: 'Branch a clonar')
+    string(name: 'FOLDER', defaultValue: './html_page', description: 'Carpeta relativa dentro del repo a desplegar (p.ej. build o dist)')
+    string(name: 'VERCEL_ORG', defaultValue: '', description: 'Org/team slug en Vercel (opcional)')
+    string(name: 'VERCEL_PROJECT', defaultValue: '', description: 'Project name en Vercel (opcional)')
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        script {
+          if (params.REPO_URL?.trim()) {
+            git url: params.REPO_URL, branch: params.BRANCH
+          } else {
+            checkout scm
+          }
+        }
+      }
+    }
+
+    stage('Install Vercel CLI (si es necesario)') {
+      steps {
+        sh '''
+          if ! command -v vercel >/dev/null 2>&1; then
+            echo "Instalando Vercel CLI globalmente..."
+            npm install -g vercel@latest
+          else
+            echo "Vercel CLI disponible"
+          fi
+        '''
+      }
+    }
+
+    stage('Deploy to Vercel') {
+      steps {
+        withCredentials([string(credentialsId: 'vercel-token', variable: 'VERCEL_TOKEN')]) {
+          script {
+            def orgFlag = params.VERCEL_ORG?.trim() ? "--scope ${params.VERCEL_ORG.trim()}" : ""
+            def projectFlag = params.VERCEL_PROJECT?.trim() ? "--project ${params.VERCEL_PROJECT.trim()}" : ""
+            dir(params.FOLDER) {
+              // Ejecuta despliegue; usa la variable de entorno VERCEL_TOKEN proporcionada por withCredentials
+              sh "npx vercel --prod --token \\$VERCEL_TOKEN --confirm ${orgFlag} ${projectFlag}"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success { echo "Despliegue en Vercel completado." }
+    failure { echo "Error en el despliegue. Revisar logs." }
+  }
+}
