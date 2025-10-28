@@ -1,5 +1,9 @@
 pipeline {
   agent any
+  
+  tools {
+    nodejs '20'
+  }
 
   parameters {
     string(name: 'REPO_URL', defaultValue: 'https://github.com/ElQuenta/Jenkins-Vercel.git', description: 'URL del repo. Si vacío se usa checkout scm (multibranch).')
